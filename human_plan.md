@@ -1,6 +1,6 @@
 Database Migration PhaseThe AI Agent's ToolImplementation Strategy
 
-1. Assessment & Discovery✅ SchemaSpyThe Assessment Agent extracts structural metadata and builds the XML dependency graph to map exact execution orders.
+1. Assessment & Discovery✅ Custom schema.sql generator + SQL/DDL parser (sqlglot)The Assessment Agent generates schema.sql per dialect via native DDL export (e.g. pg_dump --schema-only, DBMS_METADATA.GET_DDL, mysqldump --no-data), then parses it with a SQL/DDL parser to build the object catalog and dependency graph mapping exact execution orders.
 
 2. Infrastructure Setup🟡 Terraform (Future Extension)Currently out of scope. In the future, an Infrastructure Agent will use Terraform to provision the target cloud databases and VPCs.
 

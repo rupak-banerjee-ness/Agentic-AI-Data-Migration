@@ -105,7 +105,7 @@ flowchart TB
     end
 
     subgraph Tool Adapter Layer["Tool Adapters (plugin interface)"]
-        T1[SchemaSpy Adapter]
+        T1[Schema Extractor / DDL Parser Adapter]
         T2[CrackSQL Adapter]
         T3[SeaTunnel Zeta Adapter]
         T4[OpenRewrite Adapter]
@@ -197,7 +197,7 @@ migration-platform/
 │   └── planner_agent/
 ├── tool_adapters/                 # Plugin interface: BaseToolAdapter
 │   ├── base.py                    # Abstract adapter contract (run/status/rollback)
-│   ├── schemaspy_adapter/
+│   ├── schema_extractor_adapter/  # generates schema.sql per dialect, parses via SQL/DDL parser
 │   ├── cracksql_adapter/
 │   ├── seatunnel_adapter/
 │   ├── openrewrite_adapter/
@@ -238,7 +238,7 @@ migration-platform/
 | # | Agent | Responsibility (Capstone) | Tool (human_plan) | Adapter |
 |---|-------|---------------------------|--------------------|---------|
 | 1 | **Planner Agent** | Builds migration plan: sequence, priorities, risk levels, effort, manual-review flags | LLM reasoning + RAG over knowledge base | — (no external tool, pure LangGraph node) |
-| 2 | **Assessment Agent** | Discovery & schema analysis, dependency graph | SchemaSpy | `schemaspy_adapter` |
+| 2 | **Assessment Agent** | Discovery & schema analysis, dependency graph | Code-generated `schema.sql` (native per-dialect DDL export) + SQL/DDL parser (e.g. sqlglot) | `schema_extractor_adapter` |
 | 3 | **Schema Agent** | DDL / stored procedure / trigger / view translation, source→target dialect | CrackSQL (hybrid AST + LLM) | `cracksql_adapter` |
 | 4 | **Data Agent** | Bulk historical load + streaming CDC | Apache SeaTunnel (Zeta engine) | `seatunnel_adapter` |
 | 5 | **Code Agent** | Application refactor: ORM/JDBC swap (Java/Spring), raw SQL/SQLAlchemy rewrite (C++/Python) | OpenRewrite (AST) + Aider (LLM CLI) | `openrewrite_adapter`, `aider_adapter` |
@@ -256,7 +256,7 @@ classDiagram
         +status(job_id) JobStatus
         +rollback(job_id) RollbackResult
     }
-    class SchemaSpyAdapter
+    class SchemaExtractorAdapter
     class CrackSQLAdapter
     class SeaTunnelAdapter
     class OpenRewriteAdapter
@@ -265,7 +265,7 @@ classDiagram
     class KubectlAdapter
     class TerraformAdapter
 
-    BaseToolAdapter <|.. SchemaSpyAdapter
+    BaseToolAdapter <|.. SchemaExtractorAdapter
     BaseToolAdapter <|.. CrackSQLAdapter
     BaseToolAdapter <|.. SeaTunnelAdapter
     BaseToolAdapter <|.. OpenRewriteAdapter
@@ -284,7 +284,7 @@ LangGraph drives the full workflow: **Discover → Analyse → Plan → Transfor
 ```mermaid
 stateDiagram-v2
     [*] --> Discover
-    Discover --> Analyse: SchemaSpy metadata + dependency graph
+    Discover --> Analyse: schema.sql generation + DDL parse -> dependency graph
     Analyse --> Plan: Planner Agent (RAG + LLM)
     Plan --> HumanReviewPlan
 
@@ -383,15 +383,16 @@ classDiagram
 sequenceDiagram
     participant O as Orchestrator (LangGraph)
     participant AA as Assessment Agent
-    participant SS as SchemaSpy Adapter
+    participant SE as Schema Extractor / DDL Parser Adapter
     participant SDB as Source DB
     participant KB as Knowledge Base
 
     O->>AA: start(job_id, dialect_pair)
-    AA->>SS: run(connection_config)
-    SS->>SDB: introspect schema/objects
-    SDB-->>SS: metadata (tables, views, procs, FKs)
-    SS-->>AA: XML dependency graph + catalog
+    AA->>SE: run(connection_config)
+    SE->>SDB: execute per-dialect DDL export (e.g. pg_dump --schema-only, DBMS_METADATA.GET_DDL, mysqldump --no-data)
+    SDB-->>SE: raw schema.sql
+    SE->>SE: parse schema.sql with SQL/DDL parser (e.g. sqlglot) -> object catalog + dependency graph
+    SE-->>AA: catalog + dependency graph
     AA->>KB: store discovery embeddings
     AA-->>O: DiscoveryResult
 ```
