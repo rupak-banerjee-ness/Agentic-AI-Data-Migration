@@ -31,6 +31,7 @@
 - **Plugin-first**: every source dialect, target dialect, and migration tool is a swappable adapter behind a stable interface — never hard-coded into agent logic.
 - **Stateful orchestration, not scripts**: LangGraph owns the end-to-end workflow state so any phase can pause, resume, replay, or be re-entered after human review.
 - **Human-in-the-loop is a first-class node**, not an afterthought — high-risk transitions always route through an interrupt.
+- **Bounded automatic recovery, not infinite loops**: any LLM call or tool-adapter invocation retries automatically on failure, capped at **3 attempts**, before escalating to a human review interrupt (see [§6.1](#61-failure-handling--retry-policy)).
 - **Deterministic validation over LLM trust**: schema/code translation may use LLM reasoning, but data correctness is always confirmed by deterministic checksum/reconciliation code.
 - **Everything observable**: every agent call, tool invocation, and state transition is traced (LangSmith/LangFuse) and every infra/runtime metric is scraped (Prometheus/Grafana).
 - **Infra as code, deploy as code**: Terraform provisions cloud resources; Kubernetes manifests/Helm charts describe runtime; nothing is clicked manually.
@@ -319,6 +320,28 @@ stateDiagram-v2
 
 Graph nodes map 1:1 to LangGraph `StateGraph` nodes; conditional edges are implemented as router functions reading `state.status` / `state.validation_result`.
 
+### 6.1 Failure Handling & Retry Policy
+
+Every phase that invokes an LLM (Bedrock) or an external tool adapter is wrapped by the same bounded-retry policy inside its LangGraph node — the state diagram above shows the happy path; this is the failure path underneath each of those nodes:
+
+```mermaid
+flowchart TD
+    Call[Agent invokes LLM / Tool Adapter] --> Result{Success?}
+    Result -->|Yes| Continue[Advance to next phase]
+    Result -->|"No: exception, timeout,\nmalformed output, tool error"| Count{attempt < 3?}
+    Count -->|Yes| Backoff["Increment retry_count\nexponential backoff"] --> Call
+    Count -->|"No: 3 attempts failed"| Escalate["HumanReviewFailure interrupt\nerror + last attempt context surfaced"]
+    Escalate --> Decision{Reviewer Decision}
+    Decision -->|Retry| Reset[Reset retry_count = 0] --> Call
+    Decision -->|Abort| Abort[Job marked ABORTED, audit logged]
+```
+
+- **Retry limit: 3 automatic attempts** per phase (Transform/Generate translation calls, CodeRefactor LLM calls, DataMigrate/SeaTunnel job errors, Test execution) before the graph stops looping and raises a `HumanReviewFailure` interrupt.
+- `MigrationState.retry_count` (per-phase) is persisted at every checkpoint, so a resumed job does not reset its attempt count after a crash/restart.
+- On `HumanReviewFailure`, the reviewer sees the captured error/exception and can **Retry** (resets `retry_count` to 0 and re-invokes the same phase) or **Abort** (job marked `ABORTED`, same as other reject paths).
+- Applies uniformly to LLM-backed steps (Bedrock calls in Schema/Code/Planner Agents) and deterministic tool calls (SeaTunnel, checksum, kubectl) — only the definition of "failure" differs (LLM: malformed/low-confidence output or API error; tool: non-zero exit code or exception).
+- The `Test --> Validate: test report FAIL` edge in §6 is a **business-logic** retry (validation legitimately didn't pass) — distinct from this **infrastructure/LLM-call** retry, which caps a test *run's own execution* failures (e.g. runner crash, timeout) at 3 attempts before escalating.
+
 ---
 
 ## 7. Shared State Schema
@@ -341,6 +364,8 @@ classDiagram
         +DeploymentStatus deployment
         +str current_phase
         +str status
+        +int retry_count
+        +int max_retries = 3
     }
     class DialectPair {
         +str source
