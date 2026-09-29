@@ -1,85 +1,178 @@
 -- Oracle sample database - sample data for source/target testing
--- Note: This runs as sys/oracle_dev_password@//localhost:1521/XE as sysdba
+-- Runs as sys/oracle_dev_password@//localhost:1521/XE as sysdba (see
+-- runUserScripts.sh, which executes every /opt/oracle/scripts/startup/*.sql on
+-- EVERY container start, not just first init). All statements below are
+-- written to be safe to re-run: user/table/sequence creation swallows
+-- "already exists" errors via PL/SQL exception blocks.
+--
+-- Sample objects live under a dedicated SAMPLE_USER schema (not SYS) so that
+-- discovery queries can filter by owner='SAMPLE_USER' instead of having to
+-- pick our 4 tables out of thousands of Oracle-internal SYS-owned tables.
+--
+-- IMPORTANT: the initial sysdba connection lands in the CDB root, where plain
+-- (non-common, non "C##"-prefixed) user creation is rejected with ORA-65096.
+-- Switch into the XEPDB1 pluggable database first; the sample_user then lives
+-- there, reachable via service_name=XEPDB1 (not XE) on port 1521.
+ALTER SESSION SET CONTAINER = XEPDB1;
 
--- Create sample user and tablespace
-CREATE TABLESPACE sample_ts DATAFILE SIZE 100M;
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE USER sample_user IDENTIFIED BY oracle_dev_password';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -1920 THEN RAISE; END IF; -- -1920: user already exists
+END;
+/
 
-CREATE USER sample_user IDENTIFIED BY sample_password;
-GRANT CONNECT, RESOURCE, CREATE TABLE, CREATE SEQUENCE TO sample_user;
-ALTER USER sample_user DEFAULT TABLESPACE sample_ts QUOTA UNLIMITED ON sample_ts;
+GRANT CONNECT, RESOURCE, CREATE VIEW, UNLIMITED TABLESPACE TO sample_user;
 
--- Connect as sample_user and create schema
--- Note: In actual Oracle setup, you would run this as the sample_user
--- For now, we'll create in the default XE schema
+CONNECT sample_user/oracle_dev_password@//localhost:1521/XEPDB1
 
 -- Departments table
-CREATE TABLE departments (
-    department_id NUMBER PRIMARY KEY,
-    department_name VARCHAR2(100) NOT NULL UNIQUE,
-    manager_id NUMBER,
-    location VARCHAR2(100),
-    created_at DATE DEFAULT SYSDATE
-);
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE TABLE departments (
+        department_id NUMBER PRIMARY KEY,
+        department_name VARCHAR2(100) NOT NULL UNIQUE,
+        manager_id NUMBER,
+        location VARCHAR2(100),
+        created_at DATE DEFAULT SYSDATE
+    )';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF; -- -955: name already used by an object
+END;
+/
 
 -- Employees table
-CREATE TABLE employees (
-    employee_id NUMBER PRIMARY KEY,
-    first_name VARCHAR2(100) NOT NULL,
-    last_name VARCHAR2(100) NOT NULL,
-    email VARCHAR2(100) UNIQUE,
-    department_id NUMBER REFERENCES departments(department_id),
-    salary NUMBER(10, 2),
-    hire_date DATE,
-    is_active CHAR(1) DEFAULT 'Y',
-    created_at DATE DEFAULT SYSDATE
-);
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE TABLE employees (
+        employee_id NUMBER PRIMARY KEY,
+        first_name VARCHAR2(100) NOT NULL,
+        last_name VARCHAR2(100) NOT NULL,
+        email VARCHAR2(100) UNIQUE,
+        department_id NUMBER REFERENCES departments(department_id),
+        salary NUMBER(10, 2),
+        hire_date DATE,
+        is_active CHAR(1) DEFAULT ''Y'',
+        created_at DATE DEFAULT SYSDATE
+    )';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
 
 -- Add self-referencing foreign key to departments
-ALTER TABLE departments ADD CONSTRAINT fk_departments_manager 
-    FOREIGN KEY (manager_id) REFERENCES employees(employee_id);
+BEGIN
+    EXECUTE IMMEDIATE 'ALTER TABLE departments ADD CONSTRAINT fk_departments_manager
+        FOREIGN KEY (manager_id) REFERENCES employees(employee_id)';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -2275 THEN RAISE; END IF; -- -2275: constraint already exists
+END;
+/
 
 -- Projects table
-CREATE TABLE projects (
-    project_id NUMBER PRIMARY KEY,
-    project_name VARCHAR2(150) NOT NULL,
-    description CLOB,
-    start_date DATE NOT NULL,
-    end_date DATE,
-    budget NUMBER(15, 2),
-    department_id NUMBER NOT NULL REFERENCES departments(department_id),
-    status VARCHAR2(50) DEFAULT 'ACTIVE'
-);
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE TABLE projects (
+        project_id NUMBER PRIMARY KEY,
+        project_name VARCHAR2(150) NOT NULL,
+        description CLOB,
+        start_date DATE NOT NULL,
+        end_date DATE,
+        budget NUMBER(15, 2),
+        department_id NUMBER NOT NULL REFERENCES departments(department_id),
+        status VARCHAR2(50) DEFAULT ''ACTIVE''
+    )';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
 
 -- Project assignments (many-to-many)
-CREATE TABLE project_assignments (
-    assignment_id NUMBER PRIMARY KEY,
-    project_id NUMBER NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
-    employee_id NUMBER NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
-    role VARCHAR2(100),
-    allocation_percentage NUMBER(5, 2),
-    assigned_date DATE DEFAULT TRUNC(SYSDATE),
-    UNIQUE (project_id, employee_id)
-);
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE TABLE project_assignments (
+        assignment_id NUMBER PRIMARY KEY,
+        project_id NUMBER NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+        employee_id NUMBER NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
+        role VARCHAR2(100),
+        allocation_percentage NUMBER(5, 2),
+        assigned_date DATE DEFAULT TRUNC(SYSDATE),
+        UNIQUE (project_id, employee_id)
+    )';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
 
--- Create sequences for auto-increment
-CREATE SEQUENCE departments_seq START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE employees_seq START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE projects_seq START WITH 1 INCREMENT BY 1;
-CREATE SEQUENCE assignments_seq START WITH 1 INCREMENT BY 1;
+-- Sequences for auto-increment
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE SEQUENCE departments_seq START WITH 1 INCREMENT BY 1';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE SEQUENCE employees_seq START WITH 1 INCREMENT BY 1';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE SEQUENCE projects_seq START WITH 1 INCREMENT BY 1';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE SEQUENCE assignments_seq START WITH 1 INCREMENT BY 1';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
 
--- Create indexes
-CREATE INDEX idx_employees_department ON employees(department_id);
-CREATE INDEX idx_employees_email ON employees(email);
-CREATE INDEX idx_projects_department ON projects(department_id);
-CREATE INDEX idx_assignments_project ON project_assignments(project_id);
-CREATE INDEX idx_assignments_employee ON project_assignments(employee_id);
+-- Indexes
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE INDEX idx_employees_department ON employees(department_id)';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE INDEX idx_projects_department ON projects(department_id)';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE INDEX idx_assignments_project ON project_assignments(project_id)';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
+BEGIN
+    EXECUTE IMMEDIATE 'CREATE INDEX idx_assignments_employee ON project_assignments(employee_id)';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -955 THEN RAISE; END IF;
+END;
+/
 
--- Insert sample data
-INSERT INTO departments (department_id, department_name, location) 
+-- Sample data (NOTE: re-runs on every container start append duplicate rows;
+-- acceptable for disposable local/dev sample data, see docs/repo memory).
+INSERT INTO departments (department_id, department_name, location)
 VALUES (departments_seq.NEXTVAL, 'Engineering', 'Building A');
-INSERT INTO departments (department_id, department_name, location) 
+INSERT INTO departments (department_id, department_name, location)
 VALUES (departments_seq.NEXTVAL, 'Sales', 'Building B');
-INSERT INTO departments (department_id, department_name, location) 
+INSERT INTO departments (department_id, department_name, location)
 VALUES (departments_seq.NEXTVAL, 'Operations', 'Building C');
 
 INSERT INTO employees (employee_id, first_name, last_name, email, department_id, salary, hire_date)
@@ -109,5 +202,4 @@ VALUES (assignments_seq.NEXTVAL, 2, 4, 'Operations', 75.00);
 INSERT INTO project_assignments (assignment_id, project_id, employee_id, role, allocation_percentage)
 VALUES (assignments_seq.NEXTVAL, 3, 2, 'Analyst', 60.00);
 
--- Commit all changes
 COMMIT;

@@ -14,10 +14,24 @@ Each dialect must implement:
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$#]*$")
+
+
+def validate_identifier(identifier: str) -> str:
+    """Defensively validate a schema/table/column name before interpolating it
+    into generated SQL text (identifiers can't be bind-parameterized like
+    values can — see architecture.md §14). Raises ValueError on anything that
+    isn't a plain alphanumeric/underscore identifier.
+    """
+    if not identifier or not _IDENTIFIER_RE.match(identifier):
+        raise ValueError(f"Unsafe or invalid SQL identifier: {identifier!r}")
+    return identifier
 
 
 class SQLObjectType(str, Enum):
@@ -68,6 +82,17 @@ class TableMetadata:
     primary_key_columns: list[str]
     comment: Optional[str] = None
     row_count: Optional[int] = None
+
+
+@dataclass
+class ForeignKeyMetadata:
+    """A single foreign-key relationship, used to build the dependency graph."""
+
+    constraint_name: str
+    table_name: str
+    column_name: str
+    ref_table_name: str
+    ref_column_name: str
 
 
 class Dialect(ABC):
@@ -176,11 +201,38 @@ class Dialect(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_columns_query(self, table_name: str, schema: Optional[str] = None) -> str:
+        """
+        Return a SQL query listing all columns for a table.
+
+        Returns a query that produces columns (in ordinal position order):
+        [column_name, native_type, is_nullable, default_value, is_primary_key]
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_foreign_keys_query(self, schema: Optional[str] = None) -> str:
+        """
+        Return a SQL query listing all foreign-key relationships in the schema.
+
+        Returns a query that produces columns:
+        [constraint_name, table_name, column_name, ref_table_name, ref_column_name]
+
+        This is the primary source for the object dependency graph — more
+        reliable than parsing DDL text, and available via every dialect's
+        system catalog without needing a native DDL-export CLI tool.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_table_definition(self, table_name: str, schema: str) -> str:
         """
-        Get the CREATE TABLE statement for a table.
-        
-        Returns the full DDL definition.
+        Return a SQL query whose single-row/single-column result is the
+        CREATE TABLE statement (or closest native equivalent) for a table —
+        e.g. `SHOW CREATE TABLE` (MySQL), `DBMS_METADATA.GET_DDL` (Oracle), or
+        a synthesized definition from catalog views (PostgreSQL). Executed via
+        the same DB-API connection as the other query methods; no native CLI
+        dump tool required.
         """
         raise NotImplementedError
 

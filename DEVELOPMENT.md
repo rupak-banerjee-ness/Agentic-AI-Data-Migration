@@ -113,7 +113,7 @@ AWS_SECRET_ACCESS_KEY=your_secret_here
 AWS_REGION=us-east-1
 
 # Bedrock (optional, defaults provided)
-BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
+BEDROCK_MODEL_ID=amazon.nova-pro-v1:0
 BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
 
 # Local database URLs (auto-configured by docker-compose)

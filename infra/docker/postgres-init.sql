@@ -2,8 +2,8 @@
 -- Creates the platform's metadata schema including PGVector support
 
 -- Enable PGVector extension
-CREATE EXTENSION IF NOT EXISTS pgvector;
-CREATE EXTENSION IF NOT EXISTS uuid-ossp;
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Migration Jobs table
 CREATE TABLE IF NOT EXISTS migration_jobs (
@@ -38,16 +38,10 @@ CREATE TABLE IF NOT EXISTS object_catalog_entries (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Checkpoints - for state persistence and resume capability
-CREATE TABLE IF NOT EXISTS checkpoints (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    job_id UUID NOT NULL REFERENCES migration_jobs(id) ON DELETE CASCADE,
-    phase VARCHAR(100) NOT NULL,
-    state JSONB NOT NULL,
-    checkpoint_data JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_latest BOOLEAN DEFAULT FALSE
-);
+-- Note: LangGraph's Postgres checkpointer (orchestrator/checkpointer.py) owns
+-- and creates its own `checkpoints` / `checkpoint_blobs` / `checkpoint_writes` /
+-- `checkpoint_migrations` tables via `PostgresSaver.setup()` — do not define a
+-- hand-rolled `checkpoints` table here, it collides with that schema.
 
 -- Approval Records - audit trail for HITL decisions
 CREATE TABLE IF NOT EXISTS approval_records (
@@ -132,11 +126,22 @@ CREATE TABLE IF NOT EXISTS knowledge_base_entries (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Discovery Embeddings - Titan Text Embeddings v2 (1024-dim) for each
+-- discovered object, used for RAG retrieval by the Planner/Schema agents.
+CREATE TABLE IF NOT EXISTS discovery_embeddings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    job_id UUID NOT NULL REFERENCES migration_jobs(id) ON DELETE CASCADE,
+    object_type VARCHAR(50) NOT NULL,
+    object_name VARCHAR(255) NOT NULL,
+    embedding VECTOR(1024),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_discovery_embeddings_job_id ON discovery_embeddings(job_id);
+
 -- Create indexes for performance
 CREATE INDEX idx_migration_jobs_status ON migration_jobs(status);
 CREATE INDEX idx_migration_jobs_created_at ON migration_jobs(created_at);
 CREATE INDEX idx_object_catalog_job_id ON object_catalog_entries(job_id);
-CREATE INDEX idx_checkpoints_job_id ON checkpoints(job_id);
 CREATE INDEX idx_approval_records_job_id ON approval_records(job_id);
 CREATE INDEX idx_kb_embedding ON knowledge_base_entries USING ivfflat (embedding vector_cosine_ops);
 

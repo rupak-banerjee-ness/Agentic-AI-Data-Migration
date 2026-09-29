@@ -97,24 +97,24 @@ def test_mysql_sample() -> bool:
 def test_oracle_sample() -> Optional[bool]:
     """Test connection to Oracle sample database."""
     try:
-        import cx_Oracle
+        import oracledb
 
-        # Oracle requires different connection string format
-        dsn = cx_Oracle.makedsn(
+        # Sample data lives under the dedicated sample_user schema in the
+        # XEPDB1 pluggable database (not the sys/sysdba CDB root).
+        dsn = oracledb.makedsn(
             host=os.getenv("ORACLE_SAMPLE_HOST", "localhost"),
             port=int(os.getenv("ORACLE_SAMPLE_PORT", "1521")),
-            service_name=os.getenv("ORACLE_SAMPLE_SERVICE_NAME", "XE"),
+            service_name=os.getenv("ORACLE_SAMPLE_SERVICE_NAME", "XEPDB1"),
         )
 
-        conn = cx_Oracle.connect(
-            user=os.getenv("ORACLE_SAMPLE_USER", "sys"),
+        conn = oracledb.connect(
+            user=os.getenv("ORACLE_SAMPLE_USER", "sample_user"),
             password=os.getenv("ORACLE_SAMPLE_PASSWORD", "oracle_dev_password"),
             dsn=dsn,
-            mode=cx_Oracle.SYSDBA,
         )
 
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM employees;")
+        cursor.execute("SELECT COUNT(*) FROM employees")
         count = cursor.fetchone()[0]
         cursor.close()
         conn.close()
@@ -122,7 +122,7 @@ def test_oracle_sample() -> Optional[bool]:
         print(f"✓ Oracle Sample: Connected ({count} employees)")
         return True
     except ImportError:
-        print("⚠ Oracle: cx_Oracle not installed (optional)")
+        print("⚠ Oracle: oracledb not installed (optional)")
         return None
     except Exception as e:
         print(f"✗ Oracle Sample failed: {e}")

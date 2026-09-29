@@ -49,7 +49,7 @@ CREATE TABLE project_assignments (
     employee_id INT NOT NULL,
     role VARCHAR(100),
     allocation_percentage DECIMAL(5, 2),
-    assigned_date DATE DEFAULT CURDATE(),
+    assigned_date DATE DEFAULT (CURDATE()),
     FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE,
     FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
     UNIQUE KEY unique_project_employee (project_id, employee_id)

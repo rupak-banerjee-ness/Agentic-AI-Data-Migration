@@ -105,7 +105,7 @@ cp .env.example .env
 #   - AWS_ACCESS_KEY_ID
 #   - AWS_SECRET_ACCESS_KEY
 #   - AWS_REGION
-#   - BEDROCK_MODEL_ID (default: anthropic.claude-3-sonnet-...)
+#   - BEDROCK_MODEL_ID (default: amazon.nova-pro-v1:0)
 ```
 
 ### 4. Start Local Database Stack
