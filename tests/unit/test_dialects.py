@@ -24,9 +24,7 @@ def test_get_dialect_rejects_unknown_name():
         get_dialect("sqlserver")
 
 
-@pytest.mark.parametrize(
-    "identifier", ["employees", "_private", "Table1", "T$1", "T#1"]
-)
+@pytest.mark.parametrize("identifier", ["employees", "_private", "Table1", "T$1", "T#1"])
 def test_validate_identifier_accepts_safe_names(identifier: str):
     assert validate_identifier(identifier) == identifier
 

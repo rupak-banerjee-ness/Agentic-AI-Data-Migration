@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 class AdapterType(str, Enum):
     """Types of tools supported by adapters."""
+
     SQL_TRANSLATOR = "sql_translator"  # CrackSQL
     CODE_REFACTORER = "code_refactorer"  # OpenRewrite, Aider
     DATA_MIGRATOR = "data_migrator"  # SeaTunnel
@@ -26,6 +27,7 @@ class AdapterType(str, Enum):
 
 class ExecutionState(str, Enum):
     """States of tool execution."""
+
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -78,7 +80,7 @@ class RollbackResult:
 class BaseToolAdapter(ABC):
     """
     Plugin interface: agents call adapters generically through this contract only.
-    
+
     Every tool adapter must implement these core methods:
     - prepare: Validate and normalize raw config
     - run: Execute the tool synchronously
@@ -90,13 +92,13 @@ class BaseToolAdapter(ABC):
     def prepare(self, config: dict[str, Any]) -> AdapterConfig:
         """
         Validate and normalize raw job config into an `AdapterConfig`.
-        
+
         Args:
             config: Raw configuration dictionary from the agent/orchestrator.
-            
+
         Returns:
             Normalized AdapterConfig ready to pass to run().
-            
+
         Raises:
             ValueError: If configuration is invalid.
         """
@@ -106,10 +108,10 @@ class BaseToolAdapter(ABC):
     def run(self, config: AdapterConfig) -> ToolResult:
         """
         Execute the underlying tool and return its result.
-        
+
         Args:
             config: Normalized configuration from prepare().
-            
+
         Returns:
             ToolResult with success status and output.
         """
@@ -119,10 +121,10 @@ class BaseToolAdapter(ABC):
     def status(self, job_id: str) -> JobStatus:
         """
         Report the current status of a previously started job.
-        
+
         Args:
             job_id: Identifier of a long-running job.
-            
+
         Returns:
             JobStatus with current state and progress.
         """
@@ -132,10 +134,10 @@ class BaseToolAdapter(ABC):
     def rollback(self, job_id: str) -> RollbackResult:
         """
         Undo the effects of a previously run job, where supported.
-        
+
         Args:
             job_id: Identifier of the job to rollback.
-            
+
         Returns:
             RollbackResult indicating success/failure of rollback.
         """

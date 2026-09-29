@@ -72,11 +72,14 @@ def save_object_catalog(
 
 
 def save_discovery_embedding(
-    conn: psycopg.Connection, job_id: str, object_type: str, object_name: str, embedding: list[float]
+    conn: psycopg.Connection,
+    job_id: str,
+    object_type: str,
+    object_name: str,
+    embedding: list[float],
 ) -> None:
     conn.execute(
         "INSERT INTO discovery_embeddings (job_id, object_type, object_name, embedding) "
         "VALUES (%s, %s, %s, %s)",
         (job_id, object_type, object_name, embedding),
     )
-

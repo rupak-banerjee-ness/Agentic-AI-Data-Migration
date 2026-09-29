@@ -1,7 +1,7 @@
 # Implementation Plan — Agentic AI-Powered Database Migration Platform
 
 > Derived from [architecture.md](./architecture.md), [Capstone_Proposal.md](./Capstone_Proposal.md), and [human_plan.md](./human_plan.md).
-> Scope: full any-to-any Oracle/MySQL/PostgreSQL support, full production stack (Terraform/EKS/Bedrock/LangFuse/Prometheus/Grafana).
+> Scope: full any-to-any Oracle/MySQL/PostgreSQL support, full production stack (Terraform/EKS/Bedrock/LangSmith/Prometheus/Grafana).
 > Team: 2-4 engineers. Duration: 10 weeks (fits within an 8-12 week window; compress by dropping stretch items if needed).
 > Each phase ends with a demo-able increment and a defined Definition of Done (DoD).
 
@@ -86,7 +86,7 @@ On a 2-person team, merge roles: (Platform+AI) and (Data+DevOps).
 - Implement **Schema Agent** per [§8.2 sequence](./architecture.md#82-schema--logic-translation): retrieves RAG rules from KB, invokes CrackSQL adapter, returns `TranslationResult`.
 - Wire `Transform → Generate` edges; persist `TRANSLATION_RESULT` rows (source DDL, target DDL, confidence) per [§10 ERD](./architecture.md#10-data--knowledge-stores).
 - Add low-confidence-translation routing: below-threshold objects get flagged into `manual_review_objects` for a later human pass.
-- LangFuse tracing wired for every Bedrock call in this phase (prompt, tokens, latency, cost) — first real observability integration ahead of full Phase 9 rollout, since this is the first LLM-heavy phase.
+- LangSmith tracing wired for every Bedrock call in this phase (prompt, tokens, latency, cost) — first real observability integration ahead of full Phase 9 rollout, since this is the first LLM-heavy phase.
 
 **DoD:** For a representative schema, DDL/procedures/triggers/views translate source→target with confidence scores, and every LLM call is traced.
 
@@ -149,7 +149,7 @@ On a 2-person team, merge roles: (Platform+AI) and (Data+DevOps).
 
 **Goal:** Production-readiness — full tracing, metrics, dashboards, secrets, and a real pipeline.
 
-- Complete LangFuse/LangSmith tracing across **all** agent/tool calls (not just Phase 4's LLM calls) per [§13](./architecture.md#13-observability).
+- Complete LangSmith tracing across **all** agent/tool calls (not just Phase 4's LLM calls) per [§13](./architecture.md#13-observability).
 - Stand up Prometheus + Grafana with dashboards: agent latency & cost, tool success rate, migration throughput, validation pass rate, pod health/rollout status.
 - Security hardening pass against [§14](./architecture.md#14-security-considerations) checklist: Secrets Manager/IRSA for all DB and Bedrock credentials, FastAPI allow-list validation on job config, parameterized queries everywhere, typed-config command building for `kubectl`/`terraform` adapters (no raw string interpolation), private-subnet network isolation for source/target DBs.
 - Build the full GitHub Actions pipeline per [§12](./architecture.md#12-cicd-pipeline): lint → unit → build images → vulnerability scan → push ECR → deploy staging → E2E migration test (small sample DB) → manual approval gate → Terraform apply + Helm upgrade (prod).

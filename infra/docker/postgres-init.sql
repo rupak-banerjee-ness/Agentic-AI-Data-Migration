@@ -112,7 +112,10 @@ CREATE TABLE IF NOT EXISTS validation_results (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Knowledge Base - stores embeddings for migration rules and patterns
+-- Knowledge Base - stores embeddings for migration rules and patterns.
+-- 1024 dims to match Titan Text Embeddings v2 (agents/assessment_agent/embeddings.py),
+-- the same model used for discovery_embeddings below -- keeps every embedding
+-- column in this DB on one consistent model/dimension.
 CREATE TABLE IF NOT EXISTS knowledge_base_entries (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
@@ -120,7 +123,7 @@ CREATE TABLE IF NOT EXISTS knowledge_base_entries (
     source_dialect VARCHAR(50),
     target_dialect VARCHAR(50),
     content TEXT NOT NULL,
-    embedding VECTOR(384),
+    embedding VECTOR(1024),
     metadata JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

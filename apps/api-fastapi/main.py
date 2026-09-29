@@ -89,7 +89,9 @@ class ConnectionConfig(BaseModel):
     username: str
     password: SecretStr
     database: str  # DB/service to connect to (Postgres db, MySQL db, Oracle service_name)
-    schema_name: Optional[str] = None  # namespace to discover within it (Postgres only; default "public")
+    schema_name: Optional[
+        str
+    ] = None  # namespace to discover within it (Postgres only; default "public")
 
 
 class JobCreateRequest(BaseModel):
@@ -166,8 +168,14 @@ def create_job(payload: JobCreateRequest, request: Request) -> JobCreateResponse
     )
     connection_registry.register(
         job_id,
-        {**payload.source_connection.model_dump(), "password": payload.source_connection.password.get_secret_value()},
-        {**payload.target_connection.model_dump(), "password": payload.target_connection.password.get_secret_value()},
+        {
+            **payload.source_connection.model_dump(),
+            "password": payload.source_connection.password.get_secret_value(),
+        },
+        {
+            **payload.target_connection.model_dump(),
+            "password": payload.target_connection.password.get_secret_value(),
+        },
     )
     config = _thread_config(job_id)
     # Fire-and-forget: the graph advances until it hits the first interrupt (or

@@ -33,7 +33,7 @@
 - **Human-in-the-loop is a first-class node**, not an afterthought — high-risk transitions always route through an interrupt.
 - **Bounded automatic recovery, not infinite loops**: any LLM call or tool-adapter invocation retries automatically on failure, capped at **3 attempts**, before escalating to a human review interrupt (see [§6.1](#61-failure-handling--retry-policy)).
 - **Deterministic validation over LLM trust**: schema/code translation may use LLM reasoning, but data correctness is always confirmed by deterministic checksum/reconciliation code.
-- **Everything observable**: every agent call, tool invocation, and state transition is traced (LangSmith/LangFuse) and every infra/runtime metric is scraped (Prometheus/Grafana).
+- **Everything observable**: every agent call, tool invocation, and state transition is traced (LangSmith) and every infra/runtime metric is scraped (Prometheus/Grafana).
 - **Infra as code, deploy as code**: Terraform provisions cloud resources; Kubernetes manifests/Helm charts describe runtime; nothing is clicked manually.
 
 ---
@@ -58,7 +58,7 @@ flowchart TB
     Bedrock[AWS Bedrock\nNova Pro + Titan Embeddings]
     KB[(PGVector Knowledge Base)]
     K8s[Kubernetes Cluster]
-    Obs[Observability Stack\nLangFuse / Prometheus / Grafana]
+    Obs[Observability Stack\nLangSmith / Prometheus / Grafana]
 
     Eng -->|Configure migration job| UI
     Approver -->|Approve / Reject / Modify| UI
@@ -134,7 +134,7 @@ flowchart TB
     end
 
     subgraph Observability Layer
-        LF[LangFuse / LangSmith Tracing]
+        LF[LangSmith Tracing]
         Prom[Prometheus]
         Graf[Grafana Dashboards]
     end
@@ -219,7 +219,7 @@ migration-platform/
 │   ├── k8s/                       # Helm charts / manifests per app
 │   └── github-actions/            # CI/CD workflows
 ├── observability/
-│   ├── langfuse/                  # Tracing config
+│   ├── langsmith/                 # Tracing config
 │   └── grafana-dashboards/
 ├── tests/
 │   ├── unit/
@@ -654,7 +654,7 @@ flowchart TB
                 subgraph ns-observability["namespace: observability"]
                     PromPod[Prometheus]
                     GrafPod[Grafana]
-                    LFPod[LangFuse]
+                    LFPod[LangSmith]
                 end
             end
             RDS_A[(RDS/Managed DB: Dialect A\nOracle, MySQL, or PostgreSQL)]
@@ -717,7 +717,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph Traces
-        Orchpod[LangGraph Agents] -->|spans per node/tool call| LangFuse
+        Orchpod[LangGraph Agents] -->|spans per node/tool call| LangSmith
     end
     subgraph Metrics
         APIpod[FastAPI] -->|/metrics| Prometheus
@@ -725,11 +725,11 @@ flowchart LR
         SeaTunnelJob[SeaTunnel Job Metrics] --> Prometheus
     end
     Prometheus --> Grafana
-    LangFuse --> Grafana
+    LangSmith --> Grafana
     Grafana --> Dashboards["Dashboards:\nAgent latency & cost, Tool success rate,\nMigration throughput, Validation pass rate,\nPod health / rollout status"]
 ```
 
-Every LLM call (Bedrock Nova Pro / Titan) is wrapped with a LangFuse span capturing prompt, tokens, latency, and cost — enabling per-job cost attribution and prompt regression detection.
+Every LLM call (Bedrock Nova Pro / Titan) is wrapped with a LangSmith trace capturing prompt, tokens, latency, and cost — enabling per-job cost attribution and prompt regression detection.
 
 ---
 

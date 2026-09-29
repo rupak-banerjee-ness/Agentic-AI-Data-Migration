@@ -39,13 +39,17 @@ botocore = "^1.33"
 langsmith = "^0.14"
 
 # Observability & Monitoring
-langfuse = "^2.30"
 prometheus-client = "^0.19"
 
 # Data processing
 pandas = "^2.1"
-sqlglot = "^22.5"
+sqlglot = "^26.6"
 pyspark = "^3.5"
+
+# CrackSQL (Phase 4: Schema Agent) -- editable local package built from
+# ../CrackSQL/_package_build via ../CrackSQL/build_editable.py. Patched to
+# use AWS Bedrock (Nova Pro + Titan) instead of its default OpenAI backend.
+cracksql = { path = "../CrackSQL/_package_build", develop = true }
 
 # Utilities
 python-dotenv = "^1.0"

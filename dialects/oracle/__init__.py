@@ -77,17 +77,29 @@ class OracleDialect(Dialect):
 
     def get_tables_query(self, schema: Optional[str] = None) -> str:
         owner = validate_identifier(schema).upper() if schema else None
-        where = f"owner = '{owner}'" if owner else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        where = (
+            f"owner = '{owner}'"
+            if owner
+            else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        )
         return f"SELECT owner, table_name FROM all_tables WHERE {where} ORDER BY owner, table_name"
 
     def get_views_query(self, schema: Optional[str] = None) -> str:
         owner = validate_identifier(schema).upper() if schema else None
-        where = f"owner = '{owner}'" if owner else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        where = (
+            f"owner = '{owner}'"
+            if owner
+            else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        )
         return f"SELECT owner, view_name FROM all_views WHERE {where} ORDER BY owner, view_name"
 
     def get_procedures_query(self, schema: Optional[str] = None) -> str:
         owner = validate_identifier(schema).upper() if schema else None
-        where = f"owner = '{owner}'" if owner else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        where = (
+            f"owner = '{owner}'"
+            if owner
+            else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        )
         return (
             "SELECT owner, object_name FROM all_procedures "
             f"WHERE object_type = 'PROCEDURE' AND {where} ORDER BY owner, object_name"
@@ -95,7 +107,11 @@ class OracleDialect(Dialect):
 
     def get_functions_query(self, schema: Optional[str] = None) -> str:
         owner = validate_identifier(schema).upper() if schema else None
-        where = f"owner = '{owner}'" if owner else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        where = (
+            f"owner = '{owner}'"
+            if owner
+            else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        )
         return (
             "SELECT owner, object_name FROM all_procedures "
             f"WHERE object_type = 'FUNCTION' AND {where} ORDER BY owner, object_name"
@@ -103,7 +119,11 @@ class OracleDialect(Dialect):
 
     def get_triggers_query(self, schema: Optional[str] = None) -> str:
         owner = validate_identifier(schema).upper() if schema else None
-        where = f"owner = '{owner}'" if owner else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        where = (
+            f"owner = '{owner}'"
+            if owner
+            else f"owner NOT IN ({','.join(repr(s) for s in _SYSTEM_SCHEMAS)})"
+        )
         return (
             "SELECT owner, trigger_name, table_name FROM all_triggers "
             f"WHERE {where} ORDER BY owner, trigger_name"
@@ -129,7 +149,9 @@ class OracleDialect(Dialect):
         )
 
     def get_foreign_keys_query(self, schema: Optional[str] = None) -> str:
-        owner_clause = f"AND child.owner = '{validate_identifier(schema).upper()}'" if schema else ""
+        owner_clause = (
+            f"AND child.owner = '{validate_identifier(schema).upper()}'" if schema else ""
+        )
         return (
             "SELECT child.constraint_name, child.table_name, child_col.column_name, "
             "parent_col.table_name AS ref_table_name, parent_col.column_name AS ref_column_name "
@@ -149,6 +171,25 @@ class OracleDialect(Dialect):
         schema = validate_identifier(schema).upper()
         return f"SELECT DBMS_METADATA.GET_DDL('TABLE', '{table_name}', '{schema}') AS ddl FROM DUAL"
 
+    def get_view_definition(self, view_name: str, schema: str) -> str:
+        view_name = validate_identifier(view_name).upper()
+        schema = validate_identifier(schema).upper()
+        return f"SELECT DBMS_METADATA.GET_DDL('VIEW', '{view_name}', '{schema}') AS ddl FROM DUAL"
+
+    def get_procedure_definition(self, procedure_name: str, schema: str) -> str:
+        procedure_name = validate_identifier(procedure_name).upper()
+        schema = validate_identifier(schema).upper()
+        return f"SELECT DBMS_METADATA.GET_DDL('PROCEDURE', '{procedure_name}', '{schema}') AS ddl FROM DUAL"
+
+    def get_function_definition(self, function_name: str, schema: str) -> str:
+        function_name = validate_identifier(function_name).upper()
+        schema = validate_identifier(schema).upper()
+        return f"SELECT DBMS_METADATA.GET_DDL('FUNCTION', '{function_name}', '{schema}') AS ddl FROM DUAL"
+
+    def get_trigger_definition(self, trigger_name: str, schema: str, table_name: Optional[str] = None) -> str:
+        trigger_name = validate_identifier(trigger_name).upper()
+        schema = validate_identifier(schema).upper()
+        return f"SELECT DBMS_METADATA.GET_DDL('TRIGGER', '{trigger_name}', '{schema}') AS ddl FROM DUAL"
+
     def is_system_object(self, obj: SQLObject) -> bool:
         return obj.schema.upper() in _SYSTEM_SCHEMAS
-

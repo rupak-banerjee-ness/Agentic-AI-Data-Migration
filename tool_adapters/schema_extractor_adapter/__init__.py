@@ -146,7 +146,10 @@ class SchemaExtractorAdapter(BaseToolAdapter):
             rows = cursor.fetchall()
             cursor.close()
             for row in rows:
+                # Triggers queries return a 3rd column (owning table_name); other
+                # object types only return (schema, name).
                 owner, obj_name = row[0], row[1]
+                table_name = row[2] if object_type == "trigger" and len(row) > 2 else None
                 entry: dict[str, Any] = {
                     "object_type": object_type,
                     "name": obj_name,
@@ -155,7 +158,9 @@ class SchemaExtractorAdapter(BaseToolAdapter):
                 }
                 if object_type == "table":
                     entry["columns"] = self._fetch_columns(dialect, namespace, obj_name, conn)
-                    entry["definition"] = self._fetch_table_ddl(dialect, owner, obj_name, conn)
+                entry["definition"] = self._fetch_definition(
+                    dialect, object_type, owner, obj_name, table_name, conn
+                )
                 catalog.append(entry)
         return catalog
 
@@ -177,26 +182,61 @@ class SchemaExtractorAdapter(BaseToolAdapter):
         cursor.close()
         return columns
 
-    def _fetch_table_ddl(
-        self, dialect: Dialect, owner: str, table_name: str, conn: Any
+    # MySQL's SHOW CREATE * statements return several trailing metadata columns
+    # (character_set_client, collation_connection, ...) after the DDL column,
+    # so (unlike Oracle/Postgres single-column results) the DDL text isn't
+    # reliably the *last* column -- look it up by name instead.
+    _MYSQL_DDL_COLUMN = {
+        "table": "Create Table",
+        "view": "Create View",
+        "procedure": "Create Procedure",
+        "function": "Create Function",
+        "trigger": "SQL Original Statement",
+    }
+
+    def _fetch_definition(
+        self,
+        dialect: Dialect,
+        object_type: str,
+        owner: str,
+        obj_name: str,
+        table_name: Optional[str],
+        conn: Any,
     ) -> Optional[str]:
+        query_builders = {
+            "table": lambda: dialect.get_table_definition(obj_name, owner),
+            "view": lambda: dialect.get_view_definition(obj_name, owner),
+            "procedure": lambda: dialect.get_procedure_definition(obj_name, owner),
+            "function": lambda: dialect.get_function_definition(obj_name, owner),
+            "trigger": lambda: dialect.get_trigger_definition(obj_name, owner, table_name),
+        }
         try:
-            cursor = conn.cursor()
-            cursor.execute(dialect.get_table_definition(table_name, owner))
-            row = cursor.fetchone()
-            cursor.close()
-            if row is None:
-                return None
-            # Oracle returns a CLOB by default; MySQL's SHOW CREATE TABLE returns
-            # (table_name, ddl) -- in both cases the DDL text is the last column.
-            ddl = row[-1]
+            query = query_builders[object_type]()
+            if dialect.name == "mysql":
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute(query)
+                row = cursor.fetchone()
+                cursor.close()
+                if row is None:
+                    return None
+                ddl = row.get(self._MYSQL_DDL_COLUMN[object_type])
+            else:
+                cursor = conn.cursor()
+                cursor.execute(query)
+                row = cursor.fetchone()
+                cursor.close()
+                if row is None:
+                    return None
+                ddl = row[-1]
             if hasattr(ddl, "read"):
                 ddl = ddl.read()
             return str(ddl) if ddl is not None else None
         except Exception:
             return None  # DDL text is best-effort/for-display only; never fail discovery over it.
 
-    def _build_dependency_graph(self, dialect: Dialect, namespace: str, conn: Any) -> dict[str, list[str]]:
+    def _build_dependency_graph(
+        self, dialect: Dialect, namespace: str, conn: Any
+    ) -> dict[str, list[str]]:
         graph: dict[str, list[str]] = {}
         cursor = conn.cursor()
         cursor.execute(dialect.get_foreign_keys_query(namespace))
@@ -207,4 +247,3 @@ class SchemaExtractorAdapter(BaseToolAdapter):
                 graph[table_name].append(ref_table_name)
         cursor.close()
         return graph
-

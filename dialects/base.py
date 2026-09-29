@@ -36,6 +36,7 @@ def validate_identifier(identifier: str) -> str:
 
 class SQLObjectType(str, Enum):
     """Types of database objects."""
+
     TABLE = "table"
     VIEW = "view"
     INDEX = "index"
@@ -50,6 +51,7 @@ class SQLObjectType(str, Enum):
 @dataclass
 class SQLObject:
     """Represents a database object."""
+
     object_type: SQLObjectType
     name: str
     schema: str
@@ -65,6 +67,7 @@ class SQLObject:
 @dataclass
 class ColumnMetadata:
     """Metadata for a table column."""
+
     name: str
     native_type: str
     nullable: bool = True
@@ -76,6 +79,7 @@ class ColumnMetadata:
 @dataclass
 class TableMetadata:
     """Metadata for a table."""
+
     name: str
     schema: str
     columns: list[ColumnMetadata]
@@ -98,7 +102,7 @@ class ForeignKeyMetadata:
 class Dialect(ABC):
     """
     Type map + SQL grammar hooks for a single database engine.
-    
+
     Symmetric: the same class is used whether the engine is acting
     as migration source or target.
     """
@@ -119,7 +123,7 @@ class Dialect(ABC):
     def type_map(self) -> dict[str, str]:
         """
         Return the native-type -> canonical-type mapping for this dialect.
-        
+
         Example:
             {
                 'INTEGER': 'INT',
@@ -134,13 +138,13 @@ class Dialect(ABC):
     def export_ddl_command(self, connection_config: dict[str, Any]) -> list[str]:
         """
         Return the native command used to export schema-only DDL.
-        
+
         Example for PostgreSQL:
             ['pg_dump', '--schema-only', '--dbname=postgresql://...']
-            
+
         Example for MySQL:
             ['mysqldump', '--no-data', '-h', 'host', '-u', 'user', '--password=...', 'database']
-            
+
         Example for Oracle:
             ['sqlplus', '-S', 'user/pass@host:port/sid', '@', 'export.sql']
         """
@@ -150,7 +154,7 @@ class Dialect(ABC):
     def quote_identifier(self, identifier: str) -> str:
         """
         Quote a table/column/object identifier per this dialect's grammar.
-        
+
         Example:
             - PostgreSQL: 'my_table' -> '"my_table"'
             - MySQL: 'my_table' -> '`my_table`'
@@ -162,10 +166,10 @@ class Dialect(ABC):
     def build_connection_string(self, config: dict[str, Any]) -> str:
         """
         Build a connection string from the config dictionary.
-        
+
         Args:
             config: Dictionary with keys like 'host', 'port', 'username', 'password', 'database'.
-            
+
         Returns:
             Connection string in the dialect's native format.
         """
@@ -175,7 +179,7 @@ class Dialect(ABC):
     def get_tables_query(self, schema: Optional[str] = None) -> str:
         """
         Return a SQL query that lists all tables in the database (or schema).
-        
+
         Returns a query that produces columns: [schema_name, table_name, row_count (optional)]
         """
         raise NotImplementedError
@@ -236,10 +240,36 @@ class Dialect(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_view_definition(self, view_name: str, schema: str) -> str:
+        """Return a query whose single-row/single-column result is the
+        CREATE VIEW statement (or closest native equivalent) for a view."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_procedure_definition(self, procedure_name: str, schema: str) -> str:
+        """Return a query whose single-row/single-column result is the
+        CREATE PROCEDURE statement (or closest native equivalent)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_function_definition(self, function_name: str, schema: str) -> str:
+        """Return a query whose single-row/single-column result is the
+        CREATE FUNCTION statement (or closest native equivalent)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_trigger_definition(self, trigger_name: str, schema: str, table_name: Optional[str] = None) -> str:
+        """Return a query whose single-row/single-column result is the
+        CREATE TRIGGER statement (or closest native equivalent). Some
+        dialects (e.g. MySQL's SHOW CREATE TRIGGER) don't need `table_name`;
+        others accept it for convenience."""
+        raise NotImplementedError
+
     def get_object_dependencies(self, obj: SQLObject) -> list[str]:
         """
         Get a list of object names that this object depends on.
-        
+
         Override in subclasses if the dialect supports dependency tracking.
         Default: empty list.
         """
@@ -248,7 +278,7 @@ class Dialect(ABC):
     def is_system_object(self, obj: SQLObject) -> bool:
         """
         Determine if an object is a system/internal object that should be skipped.
-        
+
         Override in subclasses to define system object patterns.
         Default: False.
         """

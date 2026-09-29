@@ -46,9 +46,7 @@ def test_run_discovery_persists_catalog_and_embeddings(job_id):
     assert result.dependency_graph["projects"] == ["departments"]
 
     with metadata_store.metadata_connection() as conn:
-        row = conn.execute(
-            "SELECT status FROM migration_jobs WHERE id = %s", (job_id,)
-        ).fetchone()
+        row = conn.execute("SELECT status FROM migration_jobs WHERE id = %s", (job_id,)).fetchone()
         assert row is not None
         assert row[0] == "DISCOVERING"
 

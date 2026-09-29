@@ -220,7 +220,7 @@ On Push/PR
 - Bedrock: `BEDROCK_MODEL_ID`, `BEDROCK_EMBEDDING_MODEL_ID`
 - Databases: Host, port, credentials for all 3 sample DBs
 - API: `FASTAPI_PORT`, debug flags
-- Observability: LangFuse, LangSmith keys
+- Observability: LangSmith keys
 
 ---
 
@@ -336,7 +336,7 @@ Agentic-AI-Data-Migration/
 
 ### AWS Integration
 - **Bedrock**: Not tested yet (requires credentials)
-- **LangFuse**: Template included, not validated
+- **LangSmith**: Template included, not validated
 - **Action**: User provides AWS credentials; will test in Phase 1
 
 ### Multi-tenancy

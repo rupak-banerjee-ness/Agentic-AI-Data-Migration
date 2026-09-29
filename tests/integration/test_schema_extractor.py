@@ -70,5 +70,7 @@ def test_oracle_sample_discovery():
     )
     tables = {e["name"].lower() for e in output["object_catalog"] if e["object_type"] == "table"}
     assert tables == EXPECTED_TABLES
-    dependency_graph = {k.lower(): [v.lower() for v in vs] for k, vs in output["dependency_graph"].items()}
+    dependency_graph = {
+        k.lower(): [v.lower() for v in vs] for k, vs in output["dependency_graph"].items()
+    }
     assert dependency_graph["projects"] == ["departments"]

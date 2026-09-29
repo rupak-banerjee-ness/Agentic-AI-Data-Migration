@@ -64,7 +64,7 @@ Agentic-AI-Data-Migration/
 │   └── e2e/              # End-to-end tests
 └── observability/          # Monitoring & tracing
     ├── grafana-dashboards/
-    └── langfuse/
+    └── langsmith/
 ```
 
 ## Quick Start
@@ -250,7 +250,7 @@ class MyDialect(Dialect):
 - **Dialect Symmetry**: Source and target DBs use the same dialect interface
 - **Tool Adapters**: Pluggable external tools (CrackSQL, SeaTunnel, OpenRewrite, etc.)
 - **Knowledge Base**: RAG-powered migration rules and patterns with PGVector
-- **Observability**: Full tracing with LangFuse, metrics with Prometheus, dashboards in Grafana
+- **Observability**: Full tracing with LangSmith, metrics with Prometheus, dashboards in Grafana
 - **Checkpointing**: Pause/resume capability across restarts
 
 See [docs/architecture.md](docs/architecture.md) for detailed system design.
@@ -339,7 +339,7 @@ See [.env.example](.env.example) for all configurable options:
 - **AWS**: Region, credentials, Bedrock model IDs
 - **Databases**: Host, port, credentials for source/target DBs
 - **API**: FastAPI host/port, debug settings
-- **Observability**: LangFuse, LangSmith API keys
+- **Observability**: LangSmith API keys
 - **Deployment**: Kubernetes, namespace, environment
 
 ## Documentation

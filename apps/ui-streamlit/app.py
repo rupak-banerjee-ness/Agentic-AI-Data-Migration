@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections import Counter
 from typing import Any, Optional
 
 import requests
@@ -101,7 +102,9 @@ def _connection_form(label: str, dialect: str, key_prefix: str) -> dict[str, Any
     port = c2.number_input(
         "Port", value=defaults.get("port", 5432), step=1, key=f"{key_prefix}_port"
     )
-    username = c1.text_input("Username", value=defaults.get("username", ""), key=f"{key_prefix}_user")
+    username = c1.text_input(
+        "Username", value=defaults.get("username", ""), key=f"{key_prefix}_user"
+    )
     password = c2.text_input(
         "Password", value=defaults.get("password", ""), type="password", key=f"{key_prefix}_pw"
     )
@@ -173,13 +176,56 @@ if job["approvals"]:
     st.write("**Approval history**")
     st.table(job["approvals"])
 
+def _render_plan_summary(plan: dict[str, Any]) -> None:
+    """Structured plan-summary view (counts + risk breakdown + per-object
+    drill-down), per plan.md Phase 3 DoD -- richer than a raw JSON dump."""
+    cols = st.columns(5)
+    for col, key in zip(cols, ["tables", "views", "procedures", "functions", "triggers"]):
+        col.metric(key.capitalize(), plan.get(key, 0))
+
+    risk_register = plan.get("risk_register") or []
+    risk_counts = Counter(r["risk_level"] for r in risk_register)
+    st.write(
+        f"**Risk breakdown:** {risk_counts.get('low', 0)} low / "
+        f"{risk_counts.get('medium', 0)} medium / {risk_counts.get('high', 0)} high"
+    )
+
+    manual_review = plan.get("manual_review_objects") or []
+    if manual_review:
+        st.warning(f"{len(manual_review)} object(s) flagged for manual review: "
+                   + ", ".join(manual_review))
+
+    if risk_register:
+        with st.expander(f"Per-object risk drill-down ({len(risk_register)} objects)"):
+            st.dataframe(
+                [
+                    {
+                        "object": r["object_name"],
+                        "type": r["object_type"],
+                        "risk": r["risk_level"],
+                        "reason": r.get("reason") or "",
+                    }
+                    for r in risk_register
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
 interrupt = job.get("interrupt")
 if interrupt:
     st.divider()
     st.subheader(f"Review required: {interrupt.get('phase', interrupt.get('type', 'unknown'))}")
     st.write(interrupt.get("prompt", ""))
-    with st.expander("Details", expanded=True):
-        st.json({k: v for k, v in interrupt.items() if k not in {"prompt", "phase", "type"}})
+
+    plan = interrupt.get("plan")
+    if interrupt.get("type") == "HumanReviewPlan" and plan:
+        _render_plan_summary(plan)
+        with st.expander("Raw plan JSON"):
+            st.json(plan)
+    else:
+        with st.expander("Details", expanded=True):
+            st.json({k: v for k, v in interrupt.items() if k not in {"prompt", "phase", "type"}})
 
     reviewer = st.text_input("Reviewer name")
     comment = st.text_area("Comment (optional)")

@@ -64,7 +64,11 @@ class PostgreSQLDialect(Dialect):
 
     def get_tables_query(self, schema: Optional[str] = None) -> str:
         schema = validate_identifier(schema) if schema else None
-        where = f"AND table_schema = '{schema}'" if schema else "AND table_schema NOT IN ('pg_catalog', 'information_schema')"
+        where = (
+            f"AND table_schema = '{schema}'"
+            if schema
+            else "AND table_schema NOT IN ('pg_catalog', 'information_schema')"
+        )
         return (
             "SELECT table_schema, table_name FROM information_schema.tables "
             f"WHERE table_type = 'BASE TABLE' {where} ORDER BY table_schema, table_name"
@@ -72,12 +76,20 @@ class PostgreSQLDialect(Dialect):
 
     def get_views_query(self, schema: Optional[str] = None) -> str:
         schema = validate_identifier(schema) if schema else None
-        where = f"AND table_schema = '{schema}'" if schema else "AND table_schema NOT IN ('pg_catalog', 'information_schema')"
+        where = (
+            f"AND table_schema = '{schema}'"
+            if schema
+            else "AND table_schema NOT IN ('pg_catalog', 'information_schema')"
+        )
         return f"SELECT table_schema, table_name FROM information_schema.views WHERE TRUE {where} ORDER BY table_schema, table_name"
 
     def get_procedures_query(self, schema: Optional[str] = None) -> str:
         schema = validate_identifier(schema) if schema else None
-        where = f"AND n.nspname = '{schema}'" if schema else "AND n.nspname NOT IN ('pg_catalog', 'information_schema')"
+        where = (
+            f"AND n.nspname = '{schema}'"
+            if schema
+            else "AND n.nspname NOT IN ('pg_catalog', 'information_schema')"
+        )
         return (
             "SELECT n.nspname AS schema_name, p.proname AS proc_name "
             "FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid "
@@ -86,7 +98,11 @@ class PostgreSQLDialect(Dialect):
 
     def get_functions_query(self, schema: Optional[str] = None) -> str:
         schema = validate_identifier(schema) if schema else None
-        where = f"AND n.nspname = '{schema}'" if schema else "AND n.nspname NOT IN ('pg_catalog', 'information_schema')"
+        where = (
+            f"AND n.nspname = '{schema}'"
+            if schema
+            else "AND n.nspname NOT IN ('pg_catalog', 'information_schema')"
+        )
         return (
             "SELECT n.nspname AS schema_name, p.proname AS func_name "
             "FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid "
@@ -95,7 +111,11 @@ class PostgreSQLDialect(Dialect):
 
     def get_triggers_query(self, schema: Optional[str] = None) -> str:
         schema = validate_identifier(schema) if schema else None
-        where = f"AND n.nspname = '{schema}'" if schema else "AND n.nspname NOT IN ('pg_catalog', 'information_schema')"
+        where = (
+            f"AND n.nspname = '{schema}'"
+            if schema
+            else "AND n.nspname NOT IN ('pg_catalog', 'information_schema')"
+        )
         return (
             "SELECT n.nspname AS schema_name, t.tgname AS trigger_name, c.relname AS table_name "
             "FROM pg_trigger t "
@@ -153,6 +173,44 @@ class PostgreSQLDialect(Dialect):
             "GROUP BY n.nspname, c.relname"
         )
 
+    def get_view_definition(self, view_name: str, schema: str) -> str:
+        view_name = validate_identifier(view_name)
+        schema = validate_identifier(schema)
+        return (
+            "SELECT 'CREATE VIEW ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname) || "
+            "' AS ' || pg_get_viewdef(c.oid, true) AS ddl "
+            "FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid "
+            f"WHERE n.nspname = '{schema}' AND c.relname = '{view_name}'"
+        )
+
+    def get_procedure_definition(self, procedure_name: str, schema: str) -> str:
+        procedure_name = validate_identifier(procedure_name)
+        schema = validate_identifier(schema)
+        return (
+            "SELECT pg_get_functiondef(p.oid) AS ddl "
+            "FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid "
+            f"WHERE n.nspname = '{schema}' AND p.proname = '{procedure_name}' AND p.prokind = 'p'"
+        )
+
+    def get_function_definition(self, function_name: str, schema: str) -> str:
+        function_name = validate_identifier(function_name)
+        schema = validate_identifier(schema)
+        return (
+            "SELECT pg_get_functiondef(p.oid) AS ddl "
+            "FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid "
+            f"WHERE n.nspname = '{schema}' AND p.proname = '{function_name}' AND p.prokind = 'f'"
+        )
+
+    def get_trigger_definition(self, trigger_name: str, schema: str, table_name: Optional[str] = None) -> str:
+        trigger_name = validate_identifier(trigger_name)
+        schema = validate_identifier(schema)
+        return (
+            "SELECT pg_get_triggerdef(t.oid, true) AS ddl "
+            "FROM pg_trigger t "
+            "JOIN pg_class c ON t.tgrelid = c.oid "
+            "JOIN pg_namespace n ON c.relnamespace = n.oid "
+            f"WHERE n.nspname = '{schema}' AND t.tgname = '{trigger_name}' AND NOT t.tgisinternal"
+        )
+
     def is_system_object(self, obj: SQLObject) -> bool:
         return obj.schema in _SYSTEM_SCHEMAS
-

@@ -17,6 +17,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 
 from agents.assessment_agent import run_discovery
+from agents.planner_agent import build_plan
 from orchestrator import connection_registry
 from orchestrator.retry import with_retry
 from orchestrator.state import (
@@ -88,11 +89,14 @@ def _analyse(state: MigrationState) -> dict[str, Any]:
 
 def _plan(state: MigrationState) -> dict[str, Any]:
     _log_phase(state, "Plan")
-    # TODO(Phase 3): replace with Planner Agent (RAG + LLM) output.
+    if state.discovery is None:
+        plan = state.plan or MigrationPlan()
+    else:
+        plan = build_plan(state.discovery, state.dialects.source, state.dialects.target)
     return {
         "current_phase": "Plan",
         "status": JobStatus.PAUSED.value,  # next node is the HumanReviewPlan gate
-        "plan": (state.plan or MigrationPlan()).model_dump(),
+        "plan": plan.model_dump(),
     }
 
 
@@ -298,6 +302,7 @@ def _rollback(state: MigrationState) -> dict[str, Any]:
 # retry policy (architecture.md §6.1); pure in-process/orchestration nodes don't.
 _RETRYABLE_NODES: dict[str, Any] = {
     "Discover": _discover,
+    "Plan": _plan,
     "Transform": _transform,
     "Generate": _generate,
     "CodeRefactor": _code_refactor,
@@ -313,7 +318,7 @@ def build_state_graph() -> StateGraph:
 
     graph.add_node("Discover", with_retry("Discover", _RETRYABLE_NODES["Discover"]))
     graph.add_node("Analyse", _analyse)
-    graph.add_node("Plan", _plan)
+    graph.add_node("Plan", with_retry("Plan", _RETRYABLE_NODES["Plan"]))
     graph.add_node("HumanReviewPlan", _human_review_plan)
     graph.add_node("Transform", with_retry("Transform", _RETRYABLE_NODES["Transform"]))
     graph.add_node("Generate", with_retry("Generate", _RETRYABLE_NODES["Generate"]))

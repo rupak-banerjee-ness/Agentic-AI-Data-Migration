@@ -15,7 +15,9 @@ _lock = threading.Lock()
 _connections: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
 
 
-def register(job_id: str, source_connection: dict[str, Any], target_connection: dict[str, Any]) -> None:
+def register(
+    job_id: str, source_connection: dict[str, Any], target_connection: dict[str, Any]
+) -> None:
     with _lock:
         _connections[job_id] = (source_connection, target_connection)
 

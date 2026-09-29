@@ -152,7 +152,7 @@ Support RAG implementation with:
 - Terraform, GitHub Actions
 
 ### Observability & Monitoring
-- LangSmith / LangFuse
+- LangSmith
 - Prometheus, Grafana
 
 ---
